@@ -1,0 +1,340 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
+interface SimplePoseOverlayProps {
+  videoElement: HTMLVideoElement;
+  showOverlayInfo?: boolean;
+}
+
+export default function SimplePoseOverlay({ videoElement, showOverlayInfo = true }: SimplePoseOverlayProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(n        <div className="mt-2 p-2 bg-yellow-500 text-black font-bold">
+          👀 SHOULD SEE: 🔴 Red corners, 💛 Yellow circle, 💙 Cyan cross
+        </div>
+      </div>
+      )}
+    </>
+  );
+} const [isDrawing, setIsDrawing] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [debugInfo, setDebugInfo] = useState<string>('Initializing...');
+
+  useEffect(() => {
+    console.log('═══════════════════════════════════════════════════');
+    console.log('🎨 [SimplePoseOverlay] Component mounted');
+    console.log('📹 [SimplePoseOverlay] Video element:', videoElement);
+    setDebugInfo('Component mounted');
+
+    if (!canvasRef.current) {
+      console.error('❌ [SimplePoseOverlay] Canvas ref is NULL!');
+      setDebugInfo('ERROR: Canvas ref is null!');
+      return;
+    }
+
+    console.log('✅ [SimplePoseOverlay] Canvas ref exists:', canvasRef.current);
+
+    if (!videoElement) {
+      console.error('❌ [SimplePoseOverlay] Video element is NULL!');
+      setDebugInfo('ERROR: Video element is null!');
+      return;
+    }
+
+    console.log('✅ [SimplePoseOverlay] Video element exists');
+    console.log('📹 [SimplePoseOverlay] Video dimensions:', {
+      videoWidth: videoElement.videoWidth,
+      videoHeight: videoElement.videoHeight,
+      clientWidth: videoElement.clientWidth,
+      clientHeight: videoElement.clientHeight
+    });
+
+    setDebugInfo('Getting canvas and context...');
+    const canvas = canvasRef.current;
+
+    console.log('🎨 [SimplePoseOverlay] Canvas element:', canvas);
+    console.log('🎨 [SimplePoseOverlay] Canvas in DOM:', document.contains(canvas));
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('❌ [SimplePoseOverlay] Failed to get 2D context!');
+      setDebugInfo('ERROR: Failed to get 2D context!');
+      return;
+    }
+
+    console.log('✅ [SimplePoseOverlay] Got 2D context');
+    setDebugInfo('Got 2D context, setting up...');
+
+    // Set canvas size to match video
+    const updateCanvasSize = () => {
+      const vw = videoElement.videoWidth || 640;
+      const vh = videoElement.videoHeight || 480;
+      
+      console.log('📐 [SimplePoseOverlay] Updating canvas size to:', vw, 'x', vh);
+      
+      canvas.width = vw;
+      canvas.height = vh;
+      
+      console.log('📐 [SimplePoseOverlay] Canvas size set. Actual:', canvas.width, 'x', canvas.height);
+      console.log('📐 [SimplePoseOverlay] Canvas style:', {
+        width: canvas.style.width,
+        height: canvas.style.height,
+        position: canvas.style.position,
+        zIndex: canvas.style.zIndex
+      });
+      
+      setCanvasSize({ width: vw, height: vh });
+      setDebugInfo(`Canvas size updated: ${vw} x ${vh}`);
+    };
+
+    // Wait for video metadata to load
+    if (videoElement.videoWidth === 0) {
+      console.log('⏳ [SimplePoseOverlay] Video dimensions are 0, waiting for metadata...');
+      setDebugInfo('Waiting for video metadata...');
+      videoElement.addEventListener('loadedmetadata', () => {
+        console.log('✅ [SimplePoseOverlay] Video metadata loaded!');
+        setDebugInfo('Video metadata loaded!');
+        updateCanvasSize();
+      });
+    } else {
+      console.log('✅ [SimplePoseOverlay] Video already has dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+      setDebugInfo('Video has dimensions, updating canvas...');
+      updateCanvasSize();
+    }
+
+    setIsDrawing(true);
+    console.log('✅ [SimplePoseOverlay] Drawing flag set to true');
+
+    // Draw simple reference points (simulated pose)
+    const drawReferencePoints = () => {
+      console.log('🎨 [SimplePoseOverlay] ========== drawReferencePoints CALLED ==========');
+      setDebugInfo('drawReferencePoints called');
+
+      if (!ctx) {
+        console.error('❌ [SimplePoseOverlay] No context in draw!');
+        setDebugInfo('ERROR: No context in draw!');
+        return;
+      }
+
+      if (canvas.width === 0) {
+        console.error('❌ [SimplePoseOverlay] Canvas width is 0!');
+        setDebugInfo('ERROR: Canvas width is 0!');
+        return;
+      }
+
+      console.log('✅ [SimplePoseOverlay] Canvas ready. Size:', canvas.width, 'x', canvas.height);
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      console.log('✅ [SimplePoseOverlay] Canvas cleared');
+      setDebugInfo('Canvas cleared, drawing...');
+
+      // Calculate center and reference points
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const scale = Math.min(canvas.width, canvas.height) / 4;
+      
+      console.log('📍 [SimplePoseOverlay] Center:', centerX, centerY);
+      console.log('📍 [SimplePoseOverlay] Scale:', scale);
+
+      // Simulated body landmarks (33 points like MediaPipe)
+      const points = [
+        // Head & Face (0-10)
+        { x: centerX, y: centerY - scale * 1.5, label: '0-Nose', color: '#00ff00' },
+        { x: centerX - scale * 0.1, y: centerY - scale * 1.6, label: '1-LEye', color: '#00ff00' },
+        { x: centerX + scale * 0.1, y: centerY - scale * 1.6, label: '5-REye', color: '#00ff00' },
+        
+        // Shoulders (11-12) - IMPORTANT!
+        { x: centerX - scale * 0.6, y: centerY - scale * 0.8, label: '11-LShoulder', color: '#ffff00' },
+        { x: centerX + scale * 0.6, y: centerY - scale * 0.8, label: '12-RShoulder', color: '#ffff00' },
+        
+        // Elbows (13-14)
+        { x: centerX - scale * 0.9, y: centerY - scale * 0.2, label: '13-LElbow', color: '#00ff00' },
+        { x: centerX + scale * 0.9, y: centerY - scale * 0.2, label: '14-RElbow', color: '#00ff00' },
+        
+        // Wrists (15-16)
+        { x: centerX - scale * 1.0, y: centerY + scale * 0.3, label: '15-LWrist', color: '#00ff00' },
+        { x: centerX + scale * 1.0, y: centerY + scale * 0.3, label: '16-RWrist', color: '#00ff00' },
+        
+        // Hips (23-24)
+        { x: centerX - scale * 0.4, y: centerY + scale * 0.5, label: '23-LHip', color: '#ff00ff' },
+        { x: centerX + scale * 0.4, y: centerY + scale * 0.5, label: '24-RHip', color: '#ff00ff' },
+        
+        // Knees (25-26)
+        { x: centerX - scale * 0.4, y: centerY + scale * 1.2, label: '25-LKnee', color: '#ff00ff' },
+        { x: centerX + scale * 0.4, y: centerY + scale * 1.2, label: '26-RKnee', color: '#ff00ff' },
+      ];
+
+      console.log('🎨 [SimplePoseOverlay] Starting drawing operations...');
+      
+      // TEST 1: Fill entire canvas with semi-transparent color
+      console.log('🎨 [SimplePoseOverlay] Drawing green overlay...');
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.2)'; // Light green overlay
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      console.log('✅ [SimplePoseOverlay] Green overlay drawn');
+      
+      // TEST 2: Draw HUGE corner markers
+      console.log('🎨 [SimplePoseOverlay] Drawing red corners...');
+      ctx.fillStyle = '#ff0000'; // Bright red
+      const cornerSize = 100;
+      ctx.fillRect(0, 0, cornerSize, cornerSize); // Top-left RED
+      ctx.fillRect(canvas.width - cornerSize, 0, cornerSize, cornerSize); // Top-right RED
+      ctx.fillRect(0, canvas.height - cornerSize, cornerSize, cornerSize); // Bottom-left RED
+      ctx.fillRect(canvas.width - cornerSize, canvas.height - cornerSize, cornerSize, cornerSize); // Bottom-right RED
+      console.log('✅ [SimplePoseOverlay] Red corners drawn at corners of', canvas.width, 'x', canvas.height);
+
+      // TEST 3: Draw HUGE center cross
+      console.log('🎨 [SimplePoseOverlay] Drawing cyan cross...');
+      ctx.strokeStyle = '#00ffff'; // Cyan
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(0, centerY);
+      ctx.lineTo(canvas.width, centerY);
+      ctx.moveTo(centerX, 0);
+      ctx.lineTo(centerX, canvas.height);
+      ctx.stroke();
+      console.log('✅ [SimplePoseOverlay] Cyan cross drawn at center', centerX, centerY);
+      
+      // TEST 4: Draw HUGE center circle
+      console.log('🎨 [SimplePoseOverlay] Drawing yellow circle...');
+      ctx.strokeStyle = '#ffff00'; // Yellow
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 150, 0, 2 * Math.PI);
+      ctx.stroke();
+      console.log('✅ [SimplePoseOverlay] Yellow circle drawn at center', centerX, centerY);
+
+      // Draw skeleton lines - THICKER
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 8;
+
+      const connections = [
+        [3, 4], // shoulders
+        [3, 5], [5, 7], // left arm
+        [4, 6], [6, 8], // right arm
+        [3, 9], [4, 10], // torso
+        [9, 10], // hips
+        [9, 11], [10, 12], // legs
+      ];
+
+      connections.forEach(([start, end]) => {
+        if (points[start] && points[end]) {
+          ctx.beginPath();
+          ctx.moveTo(points[start].x, points[start].y);
+          ctx.lineTo(points[end].x, points[end].y);
+          ctx.stroke();
+        }
+      });
+
+      // Draw points - BIGGER
+      points.forEach((point, index) => {
+        // Draw circle
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 20, 0, 2 * Math.PI); // Increased from 8 to 20
+        ctx.fillStyle = point.color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Draw label - BIGGER
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px Arial'; // Increased from 12px to 24px
+        ctx.fillText(point.label, point.x + 25, point.y + 8);
+      });
+
+      // Draw info text - BIGGER
+      console.log('🎨 [SimplePoseOverlay] Drawing text info...');
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px Arial';
+      ctx.fillText('📍 TEST OVERLAY', 10, 150);
+      ctx.font = '24px Arial';
+      ctx.fillText(`Canvas: ${canvas.width}x${canvas.height}`, 10, 190);
+      ctx.fillText(`Center: ${Math.round(centerX)}, ${Math.round(centerY)}`, 10, 230);
+      ctx.fillText(`Scale: ${Math.round(scale)}`, 10, 270);
+      console.log('✅ [SimplePoseOverlay] Text info drawn');
+
+      console.log('🎉 [SimplePoseOverlay] ========== DRAWING COMPLETE ==========');
+      console.log('📊 [SimplePoseOverlay] Total points drawn:', points.length);
+      setDebugInfo(`✅ DREW ${points.length} points at center ${Math.round(centerX)},${Math.round(centerY)}`);
+    };
+
+    // Draw once after delay
+    console.log('⏱️ [SimplePoseOverlay] Scheduling draw in 500ms...');
+    const timer1 = setTimeout(() => {
+      console.log('🎬 [SimplePoseOverlay] ===== TIMER 500ms FIRED =====');
+      setDebugInfo('Timer 500ms fired, drawing...');
+      drawReferencePoints();
+    }, 500);
+
+    // Draw again after 1 second to be sure
+    console.log('⏱️ [SimplePoseOverlay] Scheduling second draw in 1000ms...');
+    const timer2 = setTimeout(() => {
+      console.log('🎬 [SimplePoseOverlay] ===== TIMER 1000ms FIRED =====');
+      setDebugInfo('Timer 1000ms fired, redrawing...');
+      drawReferencePoints();
+    }, 1000);
+
+    // Draw again after 2 seconds
+    console.log('⏱️ [SimplePoseOverlay] Scheduling third draw in 2000ms...');
+    const timer3 = setTimeout(() => {
+      console.log('🎬 [SimplePoseOverlay] ===== TIMER 2000ms FIRED =====');
+      setDebugInfo('Timer 2000ms fired, redrawing again...');
+      drawReferencePoints();
+    }, 2000);
+
+    // Redraw on window resize
+    window.addEventListener('resize', () => {
+      console.log('🔄 [SimplePoseOverlay] Window resized');
+      setDebugInfo('Window resized');
+      updateCanvasSize();
+    });
+
+    console.log('═══════════════════════════════════════════════════');
+
+    return () => {
+      console.log('🧹 [SimplePoseOverlay] Cleanup');
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      window.removeEventListener('resize', updateCanvasSize);
+      videoElement.removeEventListener('loadedmetadata', updateCanvasSize);
+    };
+  }, [videoElement]);
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 pointer-events-none"
+        style={{ 
+          zIndex: 50,
+          border: '10px solid yellow', // DEBUG: thick yellow border
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0)' // Transparent
+        }}
+      />
+      
+      {/* Debug info display */}
+      {showOverlayInfo && (
+        <div className="absolute top-20 left-4 right-4 bg-blue-900/95 text-white p-3 rounded text-xs font-mono z-[100] max-w-sm">
+        <div className="font-bold mb-2">🔍 Canvas Debug Info:</div>
+        <div className="mb-1">Status: {debugInfo}</div>
+        <div className="mb-1">Canvas Size: {canvasSize.width}x{canvasSize.height}</div>
+        <div className="mb-1">Drawing Active: {isDrawing ? '✅' : '❌'}</div>
+        <div className="mb-1">Video: {videoElement ? `✅ (${videoElement.videoWidth}x${videoElement.videoHeight})` : '❌'}</div>
+        <div className="mb-1">Canvas Ref: {canvasRef.current ? '✅' : '❌'}</div>
+        {canvasRef.current && (
+          <>
+            <div className="mb-1">Canvas Width Attr: {canvasRef.current.width}</div>
+            <div className="mb-1">Canvas Height Attr: {canvasRef.current.height}</div>
+            <div className="mb-1">Canvas Z-Index: {canvasRef.current.style.zIndex}</div>
+            <div className="mb-1">Canvas Display: {canvasRef.current.style.display || 'default'}</div>
+          </>
+        )}
+        <div className="mt-2 p-2 bg-yellow-500 text-black font-bold">
+          👀 SHOULD SEE: � Red corners, � Yellow circle, 💙 Cyan cross
+        </div>
+      </div>
+    </>
+  );
+}
