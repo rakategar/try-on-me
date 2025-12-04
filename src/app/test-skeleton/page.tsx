@@ -5,18 +5,22 @@ import Image from 'next/image';
 
 export default function TestSkeletonPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const resultCanvasRef = useRef<HTMLCanvasElement>(null); // Canvas untuk download
   const imageRef = useRef<HTMLImageElement>(null);
   const [status, setStatus] = useState('Loading...');
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
 
   useEffect(() => {
-    if (!canvasRef.current || !imageRef.current) return;
+    if (!canvasRef.current || !imageRef.current || !resultCanvasRef.current) return;
 
     const canvas = canvasRef.current;
+    const resultCanvas = resultCanvasRef.current;
     const ctx = canvas.getContext('2d');
+    const resultCtx = resultCanvas.getContext('2d');
     const img = imageRef.current;
 
-    if (!ctx) return;
+    if (!ctx || !resultCtx) return;
 
     const drawSkeletonOnImage = () => {
       if (!imageLoaded) {
@@ -27,14 +31,23 @@ export default function TestSkeletonPage() {
       // Set canvas size to match image
       canvas.width = img.naturalWidth || img.width;
       canvas.height = img.naturalHeight || img.height;
+      resultCanvas.width = img.naturalWidth || img.width;
+      resultCanvas.height = img.naturalHeight || img.height;
 
       const w = canvas.width;
       const h = canvas.height;
 
       console.log('Canvas size:', w, 'x', h);
+      console.log('Image natural size:', img.naturalWidth, 'x', img.naturalHeight);
+      console.log('Image display size:', img.width, 'x', img.height);
 
-      // Clear canvas
+      // Clear canvases
       ctx.clearRect(0, 0, w, h);
+      resultCtx.clearRect(0, 0, w, h);
+
+      // Draw original image on result canvas first
+      resultCtx.drawImage(img, 0, 0, w, h);
+      console.log('Image drawn on result canvas');
 
       // Pose landmarks berdasarkan proporsi tubuh manusia dalam foto
       // Koordinat disesuaikan dengan posisi tubuh di gambar
@@ -77,56 +90,61 @@ export default function TestSkeletonPage() {
         [11, 13], [13, 15], [12, 14], [14, 16],
       ];
 
-      // Draw lines (skeleton)
-      ctx.strokeStyle = '#00ff00';
-      ctx.lineWidth = 6;
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 4;
-      connections.forEach(([i, j]) => {
-        const p1 = points[i];
-        const p2 = points[j];
-        if (p1 && p2) {
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.stroke();
-        }
+      // Draw lines (skeleton) on BOTH canvases
+      [ctx, resultCtx].forEach(context => {
+        context.strokeStyle = '#00ff00';
+        context.lineWidth = 6;
+        context.shadowColor = '#000000';
+        context.shadowBlur = 4;
+        connections.forEach(([i, j]) => {
+          const p1 = points[i];
+          const p2 = points[j];
+          if (p1 && p2) {
+            context.beginPath();
+            context.moveTo(p1.x, p1.y);
+            context.lineTo(p2.x, p2.y);
+            context.stroke();
+          }
+        });
       });
 
-      // Draw points (joints)
-      points.forEach((point, idx) => {
-        // Different colors for different body parts
-        if (idx < 5) {
-          ctx.fillStyle = '#ff00ff'; // Face - magenta
-          ctx.strokeStyle = '#ffffff';
-        } else if (idx < 11) {
-          ctx.fillStyle = '#00ffff'; // Arms - cyan
-          ctx.strokeStyle = '#ffffff';
-        } else if (idx < 13) {
-          ctx.fillStyle = '#ffff00'; // Hips - yellow
-          ctx.strokeStyle = '#ffffff';
-        } else {
-          ctx.fillStyle = '#ff6600'; // Legs - orange
-          ctx.strokeStyle = '#ffffff';
-        }
-        
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 12, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Draw point labels
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 3;
-        ctx.font = 'bold 16px Arial';
-        ctx.strokeText(point.name, point.x + 15, point.y + 5);
-        ctx.fillText(point.name, point.x + 15, point.y + 5);
+      // Draw points (joints) on BOTH canvases
+      [ctx, resultCtx].forEach(context => {
+        points.forEach((point, idx) => {
+          // Different colors for different body parts
+          if (idx < 5) {
+            context.fillStyle = '#ff00ff'; // Face - magenta
+            context.strokeStyle = '#ffffff';
+          } else if (idx < 11) {
+            context.fillStyle = '#00ffff'; // Arms - cyan
+            context.strokeStyle = '#ffffff';
+          } else if (idx < 13) {
+            context.fillStyle = '#ffff00'; // Hips - yellow
+            context.strokeStyle = '#ffffff';
+          } else {
+            context.fillStyle = '#ff6600'; // Legs - orange
+            context.strokeStyle = '#ffffff';
+          }
+          
+          context.lineWidth = 3;
+          context.beginPath();
+          context.arc(point.x, point.y, 12, 0, 2 * Math.PI);
+          context.fill();
+          context.stroke();
+          
+          // Draw point labels
+          context.fillStyle = '#ffffff';
+          context.strokeStyle = '#000000';
+          context.lineWidth = 3;
+          context.font = 'bold 16px Arial';
+          context.strokeText(point.name, point.x + 15, point.y + 5);
+          context.fillText(point.name, point.x + 15, point.y + 5);
+        });
       });
 
       setStatus('✅ Skeleton rendered! ' + points.length + ' points');
-      console.log('Skeleton drawing complete!');
+      setCanvasReady(true);
+      console.log('Skeleton drawing complete on both canvases!');
     };
 
     // Draw when image loads
@@ -139,6 +157,62 @@ export default function TestSkeletonPage() {
     console.log('Image loaded successfully');
     setImageLoaded(true);
     setStatus('Image loaded, drawing skeleton...');
+  };
+
+  const handleDownload = () => {
+    if (!resultCanvasRef.current) {
+      alert('Canvas belum siap!');
+      return;
+    }
+
+    try {
+      // Convert canvas to blob
+      resultCanvasRef.current.toBlob((blob) => {
+        if (!blob) {
+          alert('Gagal membuat image!');
+          return;
+        }
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date().getTime();
+        link.download = `skeleton-result-${timestamp}.png`;
+        link.href = url;
+        link.click();
+        
+        // Cleanup
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        
+        console.log('Download complete!');
+        setStatus('✅ Downloaded skeleton-result-' + timestamp + '.png');
+      }, 'image/png');
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error saat download: ' + error);
+    }
+  };
+
+  const handleDownloadOverlayOnly = () => {
+    if (!canvasRef.current) {
+      alert('Canvas belum siap!');
+      return;
+    }
+
+    try {
+      const url = canvasRef.current.toDataURL('image/png');
+      const link = document.createElement('a');
+      const timestamp = new Date().getTime();
+      link.download = `skeleton-overlay-${timestamp}.png`;
+      link.href = url;
+      link.click();
+      
+      console.log('Download overlay complete!');
+      setStatus('✅ Downloaded skeleton-overlay-' + timestamp + '.png');
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error saat download: ' + error);
+    }
   };
 
   return (
@@ -156,6 +230,33 @@ export default function TestSkeletonPage() {
             <div>💛 Yellow = Hips (pinggul)</div>
             <div>🧡 Orange = Legs (lutut, pergelangan kaki)</div>
             <div className="mt-2">🟢 Green lines = Skeleton connections</div>
+          </div>
+          
+          {/* Download Buttons */}
+          <div className="mt-4 flex gap-3 flex-wrap">
+            <button
+              onClick={handleDownload}
+              disabled={!canvasReady}
+              className={`px-6 py-3 rounded-lg font-bold text-lg transition-all ${
+                canvasReady
+                  ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              📥 Download Hasil (Gambar + Skeleton)
+            </button>
+            
+            <button
+              onClick={handleDownloadOverlayOnly}
+              disabled={!canvasReady}
+              className={`px-6 py-3 rounded-lg font-bold text-lg transition-all ${
+                canvasReady
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              📥 Download Skeleton Only (Transparan)
+            </button>
           </div>
         </div>
 
@@ -179,6 +280,13 @@ export default function TestSkeletonPage() {
             style={{ opacity: 0.9 }}
           />
         </div>
+
+        {/* Hidden canvas for download (contains image + skeleton) */}
+        <canvas
+          ref={resultCanvasRef}
+          className="hidden"
+          style={{ display: 'none' }}
+        />
 
         <div className="mt-4 bg-blue-900 text-white p-4 rounded">
           <h2 className="font-bold mb-2">📋 Cara melihat hasil:</h2>
