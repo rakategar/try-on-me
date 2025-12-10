@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useLoader } from '@react-three/fiber';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { Camera, RefreshCw, Shield, AlertTriangle } from 'lucide-react';
 import * as THREE from 'three';
 
@@ -21,85 +19,104 @@ const KEYPOINT_NAMES = [
   'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
 ];
 
-// 3D T-Shirt Model Component
+// Create a T-shirt shaped geometry
+function createTShirtShape() {
+  const shape = new THREE.Shape();
+  
+  // T-shirt outline (normalized to -0.5 to 0.5)
+  // Start from left bottom
+  shape.moveTo(-0.25, -0.5);  // Left bottom
+  shape.lineTo(-0.25, -0.1);  // Left side up
+  shape.lineTo(-0.5, -0.1);   // Left sleeve out
+  shape.lineTo(-0.5, 0.15);   // Left sleeve up
+  shape.lineTo(-0.3, 0.2);    // Left sleeve in (shoulder)
+  shape.lineTo(-0.2, 0.35);   // Left collar
+  shape.lineTo(-0.1, 0.4);    // Collar left
+  shape.lineTo(0, 0.35);      // Collar center
+  shape.lineTo(0.1, 0.4);     // Collar right
+  shape.lineTo(0.2, 0.35);    // Right collar
+  shape.lineTo(0.3, 0.2);     // Right sleeve in (shoulder)
+  shape.lineTo(0.5, 0.15);    // Right sleeve up
+  shape.lineTo(0.5, -0.1);    // Right sleeve out
+  shape.lineTo(0.25, -0.1);   // Right side down
+  shape.lineTo(0.25, -0.5);   // Right bottom
+  shape.lineTo(-0.25, -0.5);  // Back to start
+  
+  return shape;
+}
+
+// Simple T-Shirt Component
 interface TShirtModelProps {
   keypoints: Keypoint[];
   videoWidth: number;
   videoHeight: number;
+  color?: string;
 }
 
-function TShirtModel({ keypoints, videoWidth, videoHeight }: TShirtModelProps) {
-  const obj = useLoader(OBJLoader, '/desainSatu/desainSatu.obj');
-  const meshRef = useRef<THREE.Group>(null);
-  const { viewport, camera } = useThree();
+function TShirtMesh({ keypoints, videoWidth, videoHeight, color = '#3B82F6' }: TShirtModelProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const { viewport } = useThree();
   
-  // Load texture
-  const texture = useLoader(THREE.TextureLoader, '/desainSatu/texture_diffuse.png');
-  
-  // Apply texture to all meshes in the OBJ
-  useEffect(() => {
-    if (obj) {
-      obj.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.material = new THREE.MeshStandardMaterial({
-            map: texture,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.95,
-          });
-        }
-      });
-    }
-  }, [obj, texture]);
+  // Create T-shirt shape geometry
+  const geometry = useMemo(() => {
+    const shape = createTShirtShape();
+    const geo = new THREE.ShapeGeometry(shape);
+    return geo;
+  }, []);
 
   useFrame(() => {
     if (!meshRef.current || keypoints.length === 0) return;
 
-    // Get key body points (indices: 5=left_shoulder, 6=right_shoulder, 11=left_hip, 12=right_hip)
     const leftShoulder = keypoints[5];
     const rightShoulder = keypoints[6];
     const leftHip = keypoints[11];
     const rightHip = keypoints[12];
     
-    // Only update if we have good keypoints
-    if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) return;
-    if (leftShoulder.score < 0.3 || rightShoulder.score < 0.3) return;
-    if (leftHip.score < 0.3 || rightHip.score < 0.3) return;
+    // Check keypoint validity
+    const hasValidKeypoints = 
+      leftShoulder?.score > 0.3 && 
+      rightShoulder?.score > 0.3 &&
+      leftHip?.score > 0.3 && 
+      rightHip?.score > 0.3;
     
-    // Calculate center of torso
-    const centerX = (leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4;
-    const centerY = (leftShoulder.y + rightShoulder.y + leftHip.y + rightHip.y) / 4;
+    if (!hasValidKeypoints) {
+      meshRef.current.visible = false;
+      return;
+    }
     
-    // Convert screen coordinates to 3D space (normalized -1 to 1)
-    // Note: Video is mirrored, so we need to flip X
+    meshRef.current.visible = true;
+    
+    // Calculate body measurements
+    const shoulderCenterX = (leftShoulder.x + rightShoulder.x) / 2;
+    const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
+    const hipCenterX = (leftHip.x + rightHip.x) / 2;
+    const hipCenterY = (leftHip.y + rightHip.y) / 2;
+    
+    // Center of torso (slightly higher than geometric center for better fit)
+    const centerX = (shoulderCenterX + hipCenterX) / 2;
+    const centerY = (shoulderCenterY * 0.6 + hipCenterY * 0.4); // Weighted towards shoulders
+    
+    // Convert to normalized coordinates (-1 to 1)
+    // Video is mirrored, so flip X
     const normalizedX = -((centerX / videoWidth) * 2 - 1);
     const normalizedY = -((centerY / videoHeight) * 2 - 1);
     
-    // Calculate scale based on shoulder width
+    // Calculate dimensions
     const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
-    const torsoHeight = Math.abs(
-      (leftShoulder.y + rightShoulder.y) / 2 - 
-      (leftHip.y + rightHip.y) / 2
-    );
+    const torsoHeight = Math.abs(shoulderCenterY - hipCenterY);
     
-    // Scale factor (adjust these values based on your model size)
-    const baseScale = 0.0015; // Adjust this based on your model size
-    const scaleFromWidth = (shoulderWidth / videoWidth) * 8;
-    const scale = Math.max(0.3, Math.min(2, scaleFromWidth)) * baseScale;
+    // Convert to 3D scale (relative to viewport)
+    const scaleX = (shoulderWidth / videoWidth) * viewport.width * 2.2; // Wider for sleeves
+    const scaleY = (torsoHeight / videoHeight) * viewport.height * 1.8; // Extend past hips
     
-    // Calculate rotation based on shoulder angle
+    // Calculate rotation from shoulder angle
     const shoulderAngle = Math.atan2(
       rightShoulder.y - leftShoulder.y,
       rightShoulder.x - leftShoulder.x
     );
     
-    // Calculate body tilt (front/back lean) based on hip vs shoulder
-    const shoulderCenterY = (leftShoulder.y + rightShoulder.y) / 2;
-    const hipCenterY = (leftHip.y + rightHip.y) / 2;
-    const bodyTilt = Math.atan2(hipCenterY - shoulderCenterY, torsoHeight) * 0.3;
-    
     // Smooth transitions
-    const lerpFactor = 0.3;
+    const lerpFactor = 0.2;
     
     // Update position
     meshRef.current.position.x = THREE.MathUtils.lerp(
@@ -114,37 +131,43 @@ function TShirtModel({ keypoints, videoWidth, videoHeight }: TShirtModelProps) {
     );
     
     // Update scale
-    const targetScale = scale * 100; // Adjust multiplier based on model
-    meshRef.current.scale.setScalar(
-      THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale, lerpFactor)
-    );
+    meshRef.current.scale.x = THREE.MathUtils.lerp(meshRef.current.scale.x, scaleX, lerpFactor);
+    meshRef.current.scale.y = THREE.MathUtils.lerp(meshRef.current.scale.y, scaleY, lerpFactor);
     
-    // Update rotation (Z for shoulder tilt, X for body lean)
+    // Update rotation (only Z axis for shoulder tilt)
     meshRef.current.rotation.z = THREE.MathUtils.lerp(
       meshRef.current.rotation.z,
       -shoulderAngle,
       lerpFactor
     );
-    meshRef.current.rotation.x = THREE.MathUtils.lerp(
-      meshRef.current.rotation.x,
-      Math.PI + bodyTilt, // Model might need rotation to face camera
-      lerpFactor
-    );
   });
 
   return (
-    <group ref={meshRef} position={[0, 0, 0]} rotation={[Math.PI, 0, 0]}>
-      <primitive object={obj.clone()} />
-    </group>
+    <mesh ref={meshRef} position={[0, 0, 0]} geometry={geometry}>
+      <meshBasicMaterial 
+        color={color}
+        transparent={true}
+        opacity={0.85}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
   );
 }
 
-// Loading fallback
+// Loading fallback - simple spinning box
 function LoadingFallback() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y = state.clock.elapsedTime;
+    }
+  });
+  
   return (
-    <mesh>
-      <boxGeometry args={[0.5, 0.5, 0.5]} />
-      <meshStandardMaterial color="gray" wireframe />
+    <mesh ref={meshRef}>
+      <boxGeometry args={[0.3, 0.3, 0.3]} />
+      <meshBasicMaterial color="#8B5CF6" wireframe />
     </mesh>
   );
 }
@@ -481,15 +504,14 @@ export default function TShirtTryOn({ showFPS = true }: Props) {
             style={{ background: 'transparent' }}
             onCreated={() => setIs3DModelLoaded(true)}
           >
-            <ambientLight intensity={0.8} />
-            <directionalLight position={[5, 5, 5]} intensity={1} />
-            <directionalLight position={[-5, 5, 5]} intensity={0.5} />
+            <ambientLight intensity={1} />
             
             <Suspense fallback={<LoadingFallback />}>
-              <TShirtModel 
+              <TShirtMesh 
                 keypoints={keypoints}
                 videoWidth={videoDimensions.width}
                 videoHeight={videoDimensions.height}
+                color="#3B82F6"
               />
             </Suspense>
           </Canvas>
