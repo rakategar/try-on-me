@@ -17,6 +17,24 @@ const nextConfig = {
   },
   // Turbopack config (Next.js 16+)
   turbopack: {},
+  
+  // Webpack config untuk handle MediaPipe (hanya di client-side)
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+      };
+    }
+    
+    // Exclude MediaPipe dari server-side bundle
+    if (isServer) {
+      config.externals = [...(config.externals || []), '@mediapipe/pose'];
+    }
+    
+    return config;
+  },
 };
 
 module.exports = nextConfig;

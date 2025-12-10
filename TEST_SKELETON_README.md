@@ -1,4 +1,4 @@
-# Test Skeleton Detection
+# Test Skeleton Detection ✨
 
 ## 🎯 Cara menggunakan halaman test ini:
 
@@ -12,6 +12,8 @@ cp ~/Downloads/your-image.jpg /home/raka/try-on-me/public/test-image.jpg
 
 # Atau bisa langsung save gambar dari browser ke public/test-image.jpg
 ```
+
+**PENTING:** Gambar harus berformat JPG/JPEG dan ukuran maksimal 5MB untuk performa optimal.
 
 ### 2. Buka halaman test
 
@@ -33,19 +35,52 @@ https://0d170ee46cce.ngrok-free.app/test-skeleton
 - 💙 Titik cyan di lengan (bahu, siku, pergelangan tangan)
 - 💛 Titik kuning di pinggul
 - 🧡 Titik orange di kaki (lutut, pergelangan kaki)
+- 📝 Label nama pada setiap titik
 
-### 4. Troubleshooting:
+### 4. Download hasil:
+
+**2 Tombol Download tersedia:**
+
+1. **📥 Download Hasil (Gambar + Skeleton)** - Hijau
+   - Download gambar lengkap dengan skeleton overlay
+   - Format: PNG dengan background gambar asli
+   - Nama file: `skeleton-result-[timestamp].png`
+
+2. **📥 Download Skeleton Only (Transparan)** - Biru
+   - Download hanya skeleton tanpa background
+   - Format: PNG dengan background transparan
+   - Cocok untuk compositing di aplikasi lain
+   - Nama file: `skeleton-overlay-[timestamp].png`
+
+**Catatan:**
+- Tombol akan AKTIF (berwarna) setelah skeleton selesai di-render (2-3 detik)
+- Jika tombol masih abu-abu, tunggu hingga status menunjukkan "✅ Skeleton rendered!"
+- File akan otomatis tersimpan di folder Downloads browser Anda
+
+### 5. Troubleshooting:
 
 **Jika skeleton tidak muncul:**
 - Buka browser console (F12) untuk melihat log
 - Pastikan gambar sudah ter-load (cek status di halaman)
-- Refresh halaman beberapa kali
+- Tunggu 2-3 detik, skeleton akan di-render otomatis
+- Cek console log: "Image drawn on result canvas" dan "Skeleton drawing complete on both canvases!"
 
 **Jika gambar tidak muncul:**
 - Pastikan file ada di `/public/test-image.jpg`
 - Cek permission file: `chmod 644 /home/raka/try-on-me/public/test-image.jpg`
+- Refresh halaman (Ctrl+R atau Cmd+R)
 
-### 5. Adjust koordinat skeleton:
+**Jika tombol download tidak aktif:**
+- Tunggu hingga status menunjukkan "✅ Skeleton rendered! 17 points"
+- Tombol akan berubah dari abu-abu menjadi hijau/biru
+- Jika masih tidak aktif, buka console dan cari error
+
+**Jika download tidak jalan:**
+- Pastikan browser tidak memblokir popup/download
+- Cek folder Downloads browser Anda
+- Coba klik tombol lagi
+
+### 6. Adjust koordinat skeleton:
 
 Jika skeleton tidak pas dengan posisi tubuh di gambar, edit file:
 `/home/raka/try-on-me/src/app/test-skeleton/page.tsx`

@@ -1,0 +1,211 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
+export default function TestSkeletonPage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const resultCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [status, setStatus] = useState('⏳ Pilih gambar untuk mulai...');
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Pilih file gambar!');
+      return;
+    }
+
+    setStatus('📂 Loading image...');
+    setCanvasReady(false);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImageSrc(event.target?.result as string);
+      setStatus('🎨 Drawing skeleton...');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    if (!imageSrc || !canvasRef.current || !resultCanvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const resultCanvas = resultCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const resultCtx = resultCanvas.getContext('2d');
+
+    if (!ctx || !resultCtx) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const w = img.width;
+      const h = img.height;
+      
+      canvas.width = w;
+      canvas.height = h;
+      resultCanvas.width = w;
+      resultCanvas.height = h;
+
+      ctx.clearRect(0, 0, w, h);
+      resultCtx.clearRect(0, 0, w, h);
+      resultCtx.drawImage(img, 0, 0, w, h);
+
+      const landmarks = [
+        { name: 'nose', x: 0.5, y: 0.12 },
+        { name: 'left_eye', x: 0.48, y: 0.10 },
+        { name: 'right_eye', x: 0.52, y: 0.10 },
+        { name: 'left_ear', x: 0.46, y: 0.11 },
+        { name: 'right_ear', x: 0.54, y: 0.11 },
+        { name: 'left_shoulder', x: 0.42, y: 0.22 },
+        { name: 'right_shoulder', x: 0.58, y: 0.22 },
+        { name: 'left_elbow', x: 0.38, y: 0.35 },
+        { name: 'right_elbow', x: 0.62, y: 0.35 },
+        { name: 'left_wrist', x: 0.36, y: 0.48 },
+        { name: 'right_wrist', x: 0.64, y: 0.48 },
+        { name: 'left_hip', x: 0.45, y: 0.52 },
+        { name: 'right_hip', x: 0.55, y: 0.52 },
+        { name: 'left_knee', x: 0.45, y: 0.72 },
+        { name: 'right_knee', x: 0.55, y: 0.72 },
+        { name: 'left_ankle', x: 0.45, y: 0.92 },
+        { name: 'right_ankle', x: 0.55, y: 0.92 },
+      ];
+
+      const points = landmarks.map(lm => ({ name: lm.name, x: lm.x * w, y: lm.y * h }));
+
+      const connections = [
+        [1, 3], [2, 4], [0, 1], [0, 2],
+        [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+        [5, 11], [6, 12], [11, 12],
+        [11, 13], [13, 15], [12, 14], [14, 16],
+      ];
+
+      [ctx, resultCtx].forEach(context => {
+        context.strokeStyle = '#00ff00';
+        context.lineWidth = Math.max(4, Math.floor(w / 200));
+        context.shadowBlur = 3;
+        
+        connections.forEach(([i, j]) => {
+          const p1 = points[i];
+          const p2 = points[j];
+          if (p1 && p2) {
+            context.beginPath();
+            context.moveTo(p1.x, p1.y);
+            context.lineTo(p2.x, p2.y);
+            context.stroke();
+          }
+        });
+
+        points.forEach((point, idx) => {
+          if (idx < 5) context.fillStyle = '#ff00ff';
+          else if (idx < 11) context.fillStyle = '#00ffff';
+          else if (idx < 13) context.fillStyle = '#ffff00';
+          else context.fillStyle = '#ff6600';
+          
+          context.strokeStyle = '#ffffff';
+          const radius = Math.max(8, Math.floor(w / 100));
+          context.lineWidth = 2;
+          context.beginPath();
+          context.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+          context.fill();
+          context.stroke();
+          
+          context.fillStyle = '#ffffff';
+          context.strokeStyle = '#000000';
+          context.lineWidth = 3;
+          context.font = `bold ${Math.max(12, Math.floor(w / 60))}px Arial`;
+          context.strokeText(point.name, point.x + 15, point.y + 5);
+          context.fillText(point.name, point.x + 15, point.y + 5);
+        });
+      });
+
+      setStatus('✅ Skeleton rendered! 17 points');
+      setCanvasReady(true);
+    };
+
+    img.src = imageSrc;
+  }, [imageSrc]);
+
+  const handleDownload = () => {
+    if (!resultCanvasRef.current || !canvasReady) return;
+    resultCanvasRef.current.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `skeleton-result-${Date.now()}.png`;
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    }, 'image/png');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 p-4">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold text-white mb-4">🎯 Test Skeleton Detection</h1>
+        
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 rounded-lg mb-4">
+          <label className="block">
+            <div className="text-white font-bold text-xl mb-3">📸 Upload Gambar Anda:</div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="block w-full text-white file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-lg file:font-semibold file:bg-white file:text-purple-700 hover:file:bg-purple-50 file:cursor-pointer cursor-pointer"
+            />
+          </label>
+          <div className="mt-3 text-white text-sm">✅ Format: JPG, PNG, WebP | 📏 Recommended: 1-5MB</div>
+        </div>
+
+        <div className="bg-black/50 text-white p-4 rounded mb-4">
+          <div className="text-lg font-bold mb-2">Status: {status}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-4">
+            <div>💜 Magenta = Face</div>
+            <div>💙 Cyan = Arms</div>
+            <div>💛 Yellow = Hips</div>
+            <div>🧡 Orange = Legs</div>
+          </div>
+          
+          <button
+            onClick={handleDownload}
+            disabled={!canvasReady}
+            className={`px-6 py-3 rounded-lg font-bold text-lg transition-all ${
+              canvasReady ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg' : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            📥 Download Hasil (Gambar + Skeleton)
+          </button>
+        </div>
+
+        {imageSrc && (
+          <div className="relative bg-white rounded-lg overflow-hidden">
+            <img src={imageSrc} alt="Uploaded" className="w-full h-auto" />
+            <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ opacity: 0.95 }} />
+          </div>
+        )}
+
+        <canvas ref={resultCanvasRef} className="hidden" />
+
+        <div className="mt-4 bg-blue-900 text-white p-4 rounded">
+          <h2 className="font-bold text-xl mb-3">📋 Cara Pakai:</h2>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li>Klik tombol <strong>Choose File</strong> di atas</li>
+            <li>Pilih gambar foto orang (JPG/PNG)</li>
+            <li>Tunggu 1-2 detik, skeleton akan muncul otomatis</li>
+            <li>Klik <strong className="text-green-300">Download Hasil</strong> untuk save</li>
+          </ol>
+          <div className="mt-4 pt-4 border-t border-blue-700">
+            <h3 className="font-bold mb-2">💡 Tips:</h3>
+            <ul className="text-sm space-y-1">
+              <li>✅ Gunakan foto dengan pose tubuh jelas</li>
+              <li>✅ Background terang agar skeleton terlihat</li>
+              <li>⚡ Pure Canvas API - super cepat!</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
